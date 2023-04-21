@@ -1,6 +1,7 @@
 import time
 import json
 import hashlib
+import pathlib
 
 """
 Mainchain transaction as described in Fig. 5
@@ -14,6 +15,7 @@ model_accuracy   - accuracy of the aggregated model
 param_hash       - hash of the parameters file
 
 """
+
 class MainchainTransaction:
     def __init__(self,
                  param_hash,
@@ -51,3 +53,43 @@ class MainchainTransaction:
             'approved_tips': self.approved_tips,
             'model_accuracy': self.model_accuracy,
         }
+
+
+# tx fs storage functions
+
+
+def tx_read(tx_file_path: pathlib.Path) -> MainchainTransaction:
+    with open(tx_file_path, 'r') as f:
+        object_params = json.load(f)
+    return MainchainTransaction(**object_params)
+
+
+def tx_save(tx: MainchainTransaction,
+            tx_path_root: pathlib.Path
+           ) -> None:
+    tx_file_path = tx_path_root / f"shard{tx.shard_id}_{tx.timestamp}.json"
+    try:
+        with open(tx_file_path, 'w') as f:
+            f.write(
+                json.dumps(
+                    tx.json_output(),
+                    default=lambda obj: obj.__dict__,
+                    sort_keys=True,
+                )
+            )
+    except Exception as e:
+        print(e)
+
+
+def genesis_tx_save(tx: MainchainTransaction,
+                    tx_path_root: pathlib.Path
+                   ) -> None:
+    tx_file_path = tx_path_root / "genesis.json"
+    with open(tx_file_path, 'w') as f:
+        f.write(
+            json.dumps(
+                tx.json_output(),
+                default=lambda obj: obj.__dict__,
+                sort_keys=True,
+            )
+        )
