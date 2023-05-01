@@ -1,0 +1,5 @@
+dag_component/cache/
+
+__pycache__/
+
+*.json

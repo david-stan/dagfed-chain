@@ -80,17 +80,3 @@ def tx_save(tx: MainchainTransaction,
             )
     except Exception as e:
         print(e)
-
-
-def genesis_tx_save(tx: MainchainTransaction,
-                    tx_path_root: pathlib.Path
-                   ) -> None:
-    tx_file_path = tx_path_root / "genesis.json"
-    with open(tx_file_path, 'w') as f:
-        f.write(
-            json.dumps(
-                tx.json_output(),
-                default=lambda obj: obj.__dict__,
-                sort_keys=True,
-            )
-        )
