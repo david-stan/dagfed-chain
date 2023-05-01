@@ -30,6 +30,7 @@ class MainchainTransaction:
         self.approved_tips = approved_tips
         self.model_accuracy = model_accuracy
         self.tx_hash = self.hash()
+        self.tx_name = f"shard_{self.shard_id}_{str(self.timestamp)}"
 
     def hash(self):
         header = {
@@ -67,7 +68,7 @@ def tx_read(tx_file_path: pathlib.Path) -> MainchainTransaction:
 def tx_save(tx: MainchainTransaction,
             tx_path_root: pathlib.Path
            ) -> None:
-    tx_file_path = tx_path_root / f"shard{tx.shard_id}_{tx.timestamp}.json"
+    tx_file_path = tx_path_root / f"{tx.tx_name}.json"
     try:
         with open(tx_file_path, 'w') as f:
             f.write(
