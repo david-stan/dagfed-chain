@@ -59,16 +59,14 @@ class MainchainTransaction:
 # tx fs storage functions
 
 
-def tx_read(tx_file_path: pathlib.Path) -> MainchainTransaction:
-    with open(tx_file_path, 'r') as f:
+def tx_read(tx_name: str) -> MainchainTransaction:
+    with open(pathlib.Path('./cache/server/txs/') / f"{tx_name}.json", 'r') as f:
         object_params = json.load(f)
     return MainchainTransaction(**object_params)
 
 
-def tx_save(tx: MainchainTransaction,
-            tx_path_root: pathlib.Path
-           ) -> None:
-    tx_file_path = tx_path_root / f"{tx.tx_name}.json"
+def tx_save(tx: MainchainTransaction) -> None:
+    tx_file_path = pathlib.Path('./cache/server/txs/') / f"{tx.tx_name}.json"
     try:
         with open(tx_file_path, 'w') as f:
             f.write(

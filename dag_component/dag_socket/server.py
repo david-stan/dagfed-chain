@@ -3,8 +3,11 @@ import threading
 import sys
 import struct
 import os
+import json
+import pathlib
 
 from dag import DAG
+import transaction
 
 BUFFER_SIZE = 1024
 
@@ -45,7 +48,19 @@ def handle_conn(conn: socket, addr, dag_obj: DAG):
         msg = conn.recv(1024).decode()
         if msg == 'requireTx':
             conn.send('ok'.encode())
-            recv_data = conn.recv(1024).decode()
-            tx_file_addr = f"./cache/server/txs/{recv_data}.json"
+            recv_data_file = conn.recv(BUFFER_SIZE).decode() # which tx is needed
+            tx_file_addr = f"./cache/server/txs/{recv_data_file}.json"
             file_send(conn, tx_file_addr)
+        elif msg == 'requireTips':
+            tips_file_addr = "./cache/server/pools/tip_pool.json"
+            file_send(conn, tips_file_addr)
+        elif msg == 'uploadTx':
+            conn.send('ok'.encode())
+            recv_data = conn.recv(BUFFER_SIZE).decode()
+            json_tx_data = json.loads(recv_data)
+            new_tx = transaction.MainchainTransaction(**json_tx_data)
+            transaction.tx_save(new_tx)
+            dag_obj.tx_publish(new_tx)
+            print(f"The new block {new_tx.tx_name} has been published!")
+
     conn.close()

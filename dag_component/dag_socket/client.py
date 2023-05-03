@@ -2,13 +2,15 @@ import socket
 import sys
 import pathlib
 import struct
+import json
 
 BUFFER_SIZE = 1024
 
-def client_trans_require(aim_addr, tx_name):
+
+def require_tx_from_server(ip_addr, tx_name):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((aim_addr, 65432))
+        s.connect((ip_addr, 65432))
     except socket.error as msg:
         print(msg)
         sys.exit(1)
@@ -20,9 +22,37 @@ def client_trans_require(aim_addr, tx_name):
     data = tx_name.encode()
     s.send(data) # send tx name
     rev_file(s, pathlib.Path('./cache/client/txs') / f"{tx_name}.json")
-    print("do ovdje")
     s.close()
 
+
+def require_tips_from_server(ip_addr):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip_addr, 65432))
+    except socket.error as msg:
+        print(msg)
+        sys.exit(1)
+    print(s.recv(1024).decode())
+    data = 'requireTips'.encode()
+    s.send(data) # initiate request
+    rev_file(s, pathlib.Path('./cache/client/pools/tip_pool.json'))
+    s.close()
+
+def upload_tx_to_server(ip_addr, tx_info):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip_addr, 65432))
+    except socket.error as msg:
+        print(msg)
+        sys.exit(1)
+    print(s.recv(1024).decode())
+    data = 'uploadTx'.encode()
+    s.send(data)
+    response = s.recv(BUFFER_SIZE)
+    data = json.dumps(tx_info.json_output()).encode()
+    s.send(data)
+    s.close()
+    
 def rev_file(conn, tx_file_path):
     header_size = struct.calcsize('64si')
     header = conn.recv(header_size)
@@ -36,4 +66,3 @@ def rev_file(conn, tx_file_path):
             bytes_received += len(buff)
             f.write(buff)
         
-

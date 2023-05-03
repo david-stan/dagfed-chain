@@ -4,7 +4,7 @@ import pathlib
 
 import transaction
 from dag import DAG
-from dag_socket import server
+from  dag_socket import server
 
 CACHE_DIR = "./cache/"
 SERVER_DATA_DIR = pathlib.Path(CACHE_DIR) / "server"
@@ -32,7 +32,7 @@ def main():
     genesis_info = "QmaBYCmzPQ2emuXpVykLDHra7t8tPiU8reFMkbHpN1rRoo"
     genesis_block = transaction.MainchainTransaction(genesis_info)
     genesis_block.tx_name = 'genesis'
-    transaction.tx_save(genesis_block, TX_DATA_DIR)
+    transaction.tx_save(genesis_block)
 
     server_dag.tx_publish(genesis_block)
     server_dag.remove_genesis()
