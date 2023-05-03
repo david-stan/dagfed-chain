@@ -1,7 +1,7 @@
 import json
 import pathlib
 
-from transaction import MainchainTransaction
+from dag_model.transaction import MainchainTransaction
 
 class DAG:
     def __init__(self, data_address = './cache/server/pools/',

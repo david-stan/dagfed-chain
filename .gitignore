@@ -1,4 +1,8 @@
-dag_component/cache/
+mainchain/cache/
+mainchain/__pycache__/
+
+subchain/cache/
+subchain/__pycache__/
 
 __pycache__/
 

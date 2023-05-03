@@ -6,8 +6,8 @@ import os
 import json
 import pathlib
 
-from dag import DAG
-import transaction
+from dag_model.dag import DAG
+import dag_model.transaction as transaction
 
 BUFFER_SIZE = 1024
 

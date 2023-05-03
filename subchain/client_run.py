@@ -2,9 +2,9 @@ import os
 import shutil
 import pathlib
 
-from dag_socket import client
+import client
 
-import transaction
+from mainchain.dag_model.transaction import MainchainTransaction
 
 CACHE_DIR = "./cache/"
 CLIENT_DATA_DIR = pathlib.Path(CACHE_DIR) / "client"
@@ -33,8 +33,8 @@ def main():
     new_tx_01 = {"approved_tips": [], "model_accuracy": 34.0, "param_hash": "jyjtyjftyj", "shard_id": 1, "timestamp": 1683119166.5689557}
     new_tx_02 = {"approved_tips": [], "model_accuracy": 2.0, "param_hash": "asefasef", "shard_id": 0, "timestamp": 2345234525.5689557}
 
-    new_tx_01 = transaction.MainchainTransaction(**new_tx_01)
-    new_tx_02 = transaction.MainchainTransaction(**new_tx_02)
+    new_tx_01 = MainchainTransaction(**new_tx_01)
+    new_tx_02 = MainchainTransaction(**new_tx_02)
 
     client.upload_tx_to_server("localhost", new_tx_01)
     client.upload_tx_to_server("localhost", new_tx_02)

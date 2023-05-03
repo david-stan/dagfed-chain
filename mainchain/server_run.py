@@ -2,8 +2,8 @@ import os
 import shutil
 import pathlib
 
-import transaction
-from dag import DAG
+import dag_model.transaction as transaction
+from dag_model.dag import DAG
 from  dag_socket import server
 
 CACHE_DIR = "./cache/"
