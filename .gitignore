@@ -3,7 +3,9 @@ mainchain/__pycache__/
 
 subchain/cache/
 subchain/__pycache__/
+subchain/data
 
 __pycache__/
 
 *.json
+*.ipynb
