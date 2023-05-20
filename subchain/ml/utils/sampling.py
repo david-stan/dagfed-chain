@@ -35,10 +35,12 @@ def cifar_noniid(dataset, num_users):
     idxs = idxs_labels[0,:]
 
     # divide and assign
-    for i in range(num_users):
-        rand_set = set(np.random.choice(idx_shard, 2, replace=False))
-        idx_shard = list(set(idx_shard) - rand_set)
-        for rand in rand_set:
-            data_user_mapping[i] = np.concatenate((data_user_mapping[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
+    # for i in range(num_users):
+    #     rand_set = set(np.random.choice(idx_shard, 2, replace=False))
+    #     idx_shard = list(set(idx_shard) - rand_set)
+    #     for rand in rand_set:
+    #         data_user_mapping[i] = np.concatenate((data_user_mapping[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
+
+    
 
     return data_user_mapping

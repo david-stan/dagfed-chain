@@ -1,12 +1,13 @@
 class BaseSettings:
-    epochs = 15
-    num_users = 50
-    client_frac = 0.1
+    epochs = 40
+    num_users = 5
+    client_frac = 0.5
     epochs_local = 15
     batch_size_local = 10
     batch_size = 32
-    learning_rate = 0.001
-    momentum = 0.9
+    learning_rate = 1e-3
+    momentum = 0.5
+    weight_decay = 5e-4
     split = 'user'
     device = -1
 

@@ -23,14 +23,18 @@ class LocalUpdate(object):
     def __init__(self, settings, dataset=None, idxs=None):
         self.settings = settings
         self.loss_func = nn.CrossEntropyLoss()
-        self.selected_clients = []
-        self.ldr_train = DataLoader(dataset, batch_size=self.settings.batch_size, shuffle=True)
+        self.ldr_train = DataLoader(DatasetSplit(dataset, idxs), batch_size=self.settings.batch_size, shuffle=True)
 
-    def train(self, net):
+    def train(self, net, user):
         net.train()
+
         # train and update
-        # optimizer = torch.optim.SGD(net.parameters(), lr=self.settings.learning_rate, momentum=self.settings.momentum)
-        optimizer = torch.optim.AdamW(net.parameters())
+        optimizer = torch.optim.SGD(
+            net.parameters(),
+            lr=self.settings.learning_rate,
+            momentum=self.settings.momentum,
+            weight_decay=self.settings.weight_decay
+        )
 
         epoch_loss = []
         for iter in range(self.settings.epochs_local):
@@ -43,9 +47,9 @@ class LocalUpdate(object):
                 loss.backward()
                 optimizer.step()
                 if batch_idx % 10 == 0:
-                    print('Update Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    print('Update Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}, device {}, user {}'.format(
                         iter, batch_idx * len(images), len(self.ldr_train.dataset),
-                               100. * batch_idx / len(self.ldr_train), loss.item()))
+                               100. * batch_idx / len(self.ldr_train), loss.item(), self.settings.device, user))
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         return net.state_dict(), sum(epoch_loss) / len(epoch_loss)
