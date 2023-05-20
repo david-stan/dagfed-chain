@@ -3,12 +3,8 @@
 # Python version: 3.6
 
 import torch
-from torch import nn, autograd
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
-import numpy as np
-import random
-from sklearn import metrics
-
 
 class DatasetSplit(Dataset):
     def __init__(self, dataset, idxs):
@@ -24,28 +20,29 @@ class DatasetSplit(Dataset):
 
 
 class LocalUpdate(object):
-    def __init__(self, args, dataset=None, idxs=None):
-        self.args = args
+    def __init__(self, settings, dataset=None, idxs=None):
+        self.settings = settings
         self.loss_func = nn.CrossEntropyLoss()
         self.selected_clients = []
-        self.ldr_train = DataLoader(DatasetSplit(dataset, idxs), batch_size=self.args.local_bs, shuffle=True)
+        self.ldr_train = DataLoader(dataset, batch_size=self.settings.batch_size, shuffle=True)
 
     def train(self, net):
         net.train()
         # train and update
-        optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=0.5)
+        # optimizer = torch.optim.SGD(net.parameters(), lr=self.settings.learning_rate, momentum=self.settings.momentum)
+        optimizer = torch.optim.AdamW(net.parameters())
 
         epoch_loss = []
-        for iter in range(self.args.local_ep):
+        for iter in range(self.settings.epochs_local):
             batch_loss = []
             for batch_idx, (images, labels) in enumerate(self.ldr_train):
-                images, labels = images.to(self.args.device), labels.to(self.args.device)
+                images, labels = images.to(self.settings.device), labels.to(self.settings.device)
                 net.zero_grad()
                 log_probs = net(images)
                 loss = self.loss_func(log_probs, labels)
                 loss.backward()
                 optimizer.step()
-                if self.args.verbose and batch_idx % 10 == 0:
+                if batch_idx % 10 == 0:
                     print('Update Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                         iter, batch_idx * len(images), len(self.ldr_train.dataset),
                                100. * batch_idx / len(self.ldr_train), loss.item()))
