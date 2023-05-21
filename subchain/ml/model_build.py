@@ -3,42 +3,30 @@ import torchvision
 import copy
 from torchvision import datasets
 
-from models.Nets import CnnNet
+from models.Nets import CnnNet, CnnMnist
 from models.test_model import test
-from utils.sampling import cifar_noniid
-from utils.sampling import cifar_iid
+from utils.sampling import mnist_noniid
+from utils.sampling import mnist_iid
 from utils.settings import BaseSettings
 from models.train_model import LocalUpdate
 from models.FedAvg import FedAvg
+from utils.datasets import get_dataset
 
 import os
 import shutil
 
 def model_build(settings):
     settings.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    train_transforms = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.RandomCrop(32, padding=4),
-            torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
-        ]
-    )
-    test_transforms = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
-        ]
-    )
-    dataset_train = datasets.CIFAR10('../data/cifar10', train=True, download=True, transform=train_transforms)
-    dataset_test = datasets.CIFAR10('../data/cifar10', train=False, download=True, transform=test_transforms)
+
+    dataset_train, dataset_test = get_dataset('mnist')
+
     # sample dataset by individual user
     if settings.iid:
-        data_user_mapping = cifar_iid(dataset_train, settings.num_users)
+        data_user_mapping = mnist_iid(dataset_train, settings.num_users)
     else:
-        data_user_mapping = cifar_noniid(dataset_train, settings.num_users)
+        data_user_mapping = mnist_noniid(dataset_train, settings)
 
-    net = CnnNet(settings=settings).to(device=settings.device)
+    net = CnnMnist(settings=settings).to(device=settings.device)
     
     return net, settings, dataset_train, dataset_test, data_user_mapping
 
@@ -58,29 +46,26 @@ if __name__ == '__main__':
     local_acc = []
     local_losses = []
     w_glob = net.state_dict()
-    weightAggFile = f"../data/local/aggWeightIteration.pkl"
-    torch.save(w_glob, weightAggFile)
-    for e in range(settings.epochs):
+    weightAggFile = lambda epoch : f"../data/local/aggWeight-epoch-{epoch}.pkl"
+    torch.save(w_glob, weightAggFile(0))
+    for epoch in range(settings.epochs):
         w_locals = []
         for user in users:
-            net.load_state_dict(torch.load(weightAggFile))
+            net.load_state_dict(torch.load(weightAggFile(epoch)))
             local = LocalUpdate(settings=settings, dataset=train_dataset, idxs=data_user_mapping[user])
             w, loss = local.train(net=copy.deepcopy(net).to(settings.device), user=user)
             acc, loss = model_evaluate(net, w, test_dataset, settings)
             local_acc.append(acc)
             local_losses.append(loss)
-            weightLocalFile = f"../data/local/user-{user}--epoch-{e}.pkl"
-            torch.save(w, weightLocalFile)
-        for user in users:
-            weightLocalFile = f"../data/local/user-{user}--epoch-{e}.pkl"
-            w_local = torch.load(weightLocalFile)
-            w_locals.append(w_local)
+            # weightLocalFile = f"../data/local/user-{user}--epoch-{e}.pkl"
+            # torch.save(w, weightLocalFile)
+            w_locals.append(w)
         w_glob = FedAvg(w_locals)
-        torch.save(w_glob, weightAggFile)
+        torch.save(w_glob, weightAggFile(epoch + 1))
         loss_avg = sum(local_losses) / len(local_losses)
         acc_avg = sum(local_acc) / len(local_acc)
-        print('Epoch {:3d}, Average loss {:.3f}'.format(e, loss_avg))
-        print('Epoch {:3d}, Average acc {:.3f}'.format(e, acc_avg))
+        print('Epoch {:3d}, Average loss {:.3f}'.format(epoch, loss_avg))
+        print('Epoch {:3d}, Average acc {:.3f}'.format(epoch, acc_avg))
 
 
     print(acc, loss)
