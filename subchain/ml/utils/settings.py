@@ -2,7 +2,7 @@ class BaseSettings:
     epochs = 15
     num_users = 5
     client_frac = 0.5
-    non_iid_frac = 0.75
+    non_iid_frac = 0.8
     epochs_local = 5
     batch_size_local = 10
     batch_size = 32

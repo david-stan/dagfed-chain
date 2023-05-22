@@ -57,8 +57,6 @@ if __name__ == '__main__':
             acc, loss = model_evaluate(net, w, test_dataset, settings)
             local_acc.append(acc)
             local_losses.append(loss)
-            # weightLocalFile = f"../data/local/user-{user}--epoch-{e}.pkl"
-            # torch.save(w, weightLocalFile)
             w_locals.append(w)
         w_glob = FedAvg(w_locals)
         torch.save(w_glob, weightAggFile(epoch + 1))
