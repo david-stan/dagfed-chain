@@ -166,7 +166,7 @@ def main():
 
         ## initiate task release
         while 1:
-            taskRelease = subprocess.Popen(["./hyperledger_invoke.sh release " + taskID], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+            taskRelease = subprocess.Popen([f"./hyperledger_invoke.sh release {taskID} {taskEpochs}"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
             trOuts, trErrs = taskRelease.communicate(timeout=10)
             if taskRelease.poll() == 0:
                 print('*** ' + taskID + ' has been released! ***')
@@ -178,6 +178,20 @@ def main():
                 time.sleep(2)
 
         ## initiate task with base parameter hash
+        while 1:
+            spcAggModelPublish = subprocess.Popen(args=[f"./hyperledger_invoke.sh aggregated {taskID} 0 training {basefileHash}"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+            aggPubOuts, aggPubErrs = spcAggModelPublish.communicate(timeout=10)
+            if spcAggModelPublish.poll() == 0:
+                print('*** The init aggModel of ' + taskID + ' has been published! ***')
+                print('*** And the detail of the init aggModel is ' + aggPubOuts.strip() + ' ! ***\n')
+                break
+            else:
+                print(aggPubErrs)
+                print('*** Failed to publish the init aggModel of ' + taskID + ' ! ***\n')
+        
+        # ## wait the local train
+        # time.sleep(10)
+
 
         break
 

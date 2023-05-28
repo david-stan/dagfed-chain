@@ -33,17 +33,7 @@ setEnvironments() {
 function taskRelease() {
   ORG=$1
   setEnvironments $ORG
-  # query='{"function":"CreateTaskReleaseAsset","Args":['\"task_release\"','\"$2\"']}'
-  invoke="peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${FabricL}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{\"function\":\"CreateTaskReleaseAsset\",\"Args\":[\"task_release\", \"5grfti\"]}'"
-  # echo $invoke
-  eval ${invoke}
-}
-
-function taskReleaseRemove() {
-  ORG=$1
-  setEnvironments $ORG
-  invoke="peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${FabricL}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{\"function\":\"DeleteTaskReleaseAsset\",\"Args\":[\"task_release\"]}'"
-  # echo $invoke
+  invoke="peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${FabricL}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{\"function\":\"CreateorUpdateReleaseAsset\",\"Args\":[\"task_release\", \"$2\", \"$3\"]}'"
   eval ${invoke}
 }
 
@@ -51,7 +41,7 @@ function taskReleaseRemove() {
 function publishAggModel() {
   ORG=$1
   setEnvironments $ORG
-  invoke="docker exec cli peer chaincode invoke -o orderer.example.com:7050 --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -C mychannel -n mycc -c '{\"Args\":[\"set\",\"${2}\",\"{\\\"epoch\\\":$3,\\\"status\\\":\\\"$4\\\",\\\"paras\\\":\\\"$5\\\"}\"]}'"
+  invoke="peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${FabricL}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${FabricL}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{\"function\":\"CreateOrUpdateTaskAsset\",\"Args\":[\"$2\", \"$3\", \"$4\", \"$5\"]}'"
   eval ${invoke}
 }
 
@@ -68,7 +58,14 @@ function queryRelease(){
   ORG=$1
   setEnvironments $ORG
   query="peer chaincode query -C mychannel -n basic -c '{\"Args\":[\"ReadTaskReleaseAsset\", \"task_release\"]}'"
-  # echo $query
+  eval ${query}
+}
+
+# Query the info from the chaincode
+function queryTask(){
+  ORG=$1
+  setEnvironments $ORG
+  query="peer chaincode query -C mychannel -n basic -c '{\"Args\":[\"ReadTaskAsset\", \"$2\"]}'"
   eval ${query}
 }
 
@@ -81,7 +78,7 @@ else
 fi
 
 if [ "${MODE}" == "release" ]; then
-  taskRelease 1 $1
+  taskRelease 1 $1 $2
   sleep 2
   queryRelease 1
 elif [ "${MODE}" == "local" ]; then
@@ -89,9 +86,11 @@ elif [ "${MODE}" == "local" ]; then
 elif [ "${MODE}" == "aggregated" ]; then
   publishAggModel 1 $1 $2 $3 $4
   sleep 2
-  query 1 $1
-elif [ "${MODE}" == "query" ]; then
-  query 1 $1
+  queryTask 1 $1
+elif [ "${MODE}" == "query_release" ]; then
+  queryRelease 1
+elif [ "${MODE}" == "query_task" ]; then
+  queryTask 1 $1
 else
   printHelp
   exit 1
