@@ -49,7 +49,7 @@ def upload_tx_to_server(ip_addr, tx_info):
     data = 'uploadTx'.encode()
     s.send(data)
     response = s.recv(BUFFER_SIZE)
-    data = json.dumps(tx_info.json_output()).encode()
+    data = json.dumps(tx_info).encode()
     s.send(data)
     s.close()
     

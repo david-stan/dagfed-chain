@@ -29,13 +29,13 @@ def main():
 
     server_dag = DAG()
 
-    genesis_info = "QmaBYCmzPQ2emuXpVykLDHra7t8tPiU8reFMkbHpN1rRoo"
-    genesis_block = transaction.MainchainTransaction(genesis_info)
-    genesis_block.tx_name = 'genesis'
-    transaction.tx_save(genesis_block)
+    # genesis_info = "QmaBYCmzPQ2emuXpVykLDHra7t8tPiU8reFMkbHpN1rRoo"
+    # genesis_block = transaction.MainchainTransaction(genesis_info)
+    # genesis_block.tx_name = 'genesis'
+    # transaction.tx_save(genesis_block)
 
-    server_dag.tx_publish(genesis_block)
-    server_dag.remove_genesis()
+    # server_dag.tx_publish(genesis_block)
+    # server_dag.remove_genesis()
 
     while True:
         server.create_server_socket(server_dag)

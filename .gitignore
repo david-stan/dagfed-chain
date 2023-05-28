@@ -4,6 +4,7 @@ mainchain/__pycache__/
 subchain/cache/
 subchain/__pycache__/
 subchain/data
+data/
 
 __pycache__/
 

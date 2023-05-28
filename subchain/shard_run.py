@@ -1,17 +1,37 @@
 import os
 import shutil
+import sys
 import pathlib
+import torch
+import time
+import uuid
+import json
+import random
+import copy
+import subprocess
 
 import client
 
-from mainchain.dag_model.transaction import MainchainTransaction
+sys.path.append('./ml')
+sys.path.append('../')
+# sys.path.append('../../commonComponent')
+
+from ml.utils.settings import BaseSettings
+from ml.model_build import model_build
+from ml.model_build import model_evaluate
+from ml.models.FedAvg import FedAvg
+
+from common.ipfs import ipfsAddFile
+from common.ipfs import ipfsGetFile
 
 CACHE_DIR = "./cache/"
 CLIENT_DATA_DIR = pathlib.Path(CACHE_DIR) / "client"
 TX_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "txs"
 TIPS_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "pools"
+PARAMS_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "params"
 
 def main():
+    
     if os.path.exists(CACHE_DIR) == False:
         os.mkdir(CACHE_DIR)
 
@@ -27,17 +47,149 @@ def main():
         shutil.rmtree(TIPS_DATA_DIR)
     os.mkdir(TIPS_DATA_DIR)
 
-    client.require_tx_from_server("localhost", "genesis")
-    client.require_tips_from_server("localhost")
+    if os.path.exists(PARAMS_DATA_DIR):
+        shutil.rmtree(PARAMS_DATA_DIR)
+    os.mkdir(PARAMS_DATA_DIR)
 
-    new_tx_01 = {"approved_tips": [], "model_accuracy": 34.0, "param_hash": "jyjtyjftyj", "shard_id": 1, "timestamp": 1683119166.5689557}
-    new_tx_02 = {"approved_tips": [], "model_accuracy": 2.0, "param_hash": "asefasef", "shard_id": 0, "timestamp": 2345234525.5689557}
+    ## setup
 
-    new_tx_01 = MainchainTransaction(**new_tx_01)
-    new_tx_02 = MainchainTransaction(**new_tx_02)
+    alpha = 3
 
-    client.upload_tx_to_server("localhost", new_tx_01)
-    client.upload_tx_to_server("localhost", new_tx_02)
+    # client.require_tx_from_server("localhost", "genesis")
+    # client.require_tips_from_server("localhost")
+
+    net, settings, _, test_dataset, data_user_mapping = model_build(BaseSettings())
+    net_weight = net.state_dict()
+    net_accuracy, _ = model_evaluate(net, net_weight, test_dataset, settings)
+
+    genesisFile = './cache/client/genesis.pkl'
+    torch.save(net_weight, genesisFile)
+
+    while 1:
+        genesisHash, statusCode = ipfsAddFile(genesisFile)
+        if statusCode == 0:
+            print('\nThe base mode parasfile ' + genesisFile + ' has been uploaded!')
+            print('And the fileHash is ' + genesisHash + '\n')
+            break
+        else:
+            print('Error: ' + genesisHash)
+            print('\nFailed to upload the aggregated parasfile ' + genesisFile + ' !\n')
+
+    genesisTxInfo = {"approved_tips": [], "model_accuracy": float(net_accuracy), "param_hash": genesisHash, "shard_id": 0, "timestamp": time.time()}
+    client.upload_tx_to_server("localhost", genesisTxInfo)
+
+    time.sleep(1)
+
+    iteration = 0
+    while 1:
+        print(f"********************* Iteration {iteration} ***************************")
+
+        taskID = str(uuid.uuid4())[:8]
+
+        apv_tx_cands = []
+        client.require_tips_from_server("localhost") 
+        # implement promise later
+        time.sleep(2)
+        with open("./cache/client/pools/tip_pool.json", 'r') as f:
+            tips_dict = json.load(f)
+        
+        if len(tips_dict) <= alpha:
+            apv_tx_cands = list(tips_dict.keys())
+        else:
+            apv_tx_cands = random.sample(tips_dict.keys(), alpha)
+
+        print(f"The candidates tips are {apv_tx_cands}")
+
+        apv_tx_cands_dict = {}
+        for apv_tx in apv_tx_cands:
+            apv_tx_file = f"./cache/client/txs/{apv_tx}.json"
+            client.require_tx_from_server("localhost", apv_tx)
+            with open(apv_tx_file) as f:
+                tx_info = json.load(f)
+
+            print(tx_info)
+
+            apv_tx_file = f"./cache/client/params/iter-{iteration}-{apv_tx}.pkl"
+
+            while 1:
+                status, code = ipfsGetFile(tx_info['param_hash'], apv_tx_file)
+                print('The filehash of this approved trans is ' + tx_info['param_hash'] + ', and the file is ' + apv_tx_file + '!')
+                if code == 0:
+                    print(status.strip())
+                    print('The apv parasfile ' + apv_tx_file + ' has been downloaded!\n')
+                    break
+                else:
+                    print(status)
+                    print('\nFailed to download the apv parasfile ' + apv_tx_file + ' !\n')
+            apv_tx_cands_dict[apv_tx] = float(tx_info['model_accuracy'])
+
+        apv_trans_final = []
+        if len(apv_tx_cands_dict) == alpha:
+            sort_dict = sorted(apv_tx_cands_dict.items(),key=lambda x:x[1],reverse=True)
+            for i in range(alpha - 1):
+                apv_trans_final.append(sort_dict[i][0])
+        else:
+            apv_trans_final = apv_tx_cands
+
+        # aggregating approver parameters
+        w_apv_agg = []
+        for apv_tx in apv_trans_final:
+            apv_param_file = f"./cache/client/params/iter-{iteration}-{apv_tx}.pkl"
+            net.load_state_dict(torch.load(apv_param_file))
+            w_tmp_iter = net.state_dict()
+            w_apv_agg.append(copy.deepcopy(w_tmp_iter))
+        
+        if len(w_apv_agg) == 1:
+            w_glob = w_apv_agg[0]
+        else:
+            w_glob = FedAvg(w_apv_agg)
+
+        iteration_base_param_file = f"./cache/client/params/base-iter-{iteration}.pkl"
+        torch.save(w_glob, iteration_base_param_file)
+
+        base_model_acc, base_model_loss = model_evaluate(net, w_glob, test_dataset, settings)
+
+        print(base_model_acc)
+
+        while 1:
+            basefileHash, baseSttCode = ipfsAddFile(iteration_base_param_file)
+            if baseSttCode == 0:
+                print('\nThe base mode parasfile ' + iteration_base_param_file + ' has been uploaded!')
+                print('And the fileHash is ' + basefileHash + '\n')
+                break
+            else:
+                print('Error: ' + basefileHash)
+                print('\nFailed to uploaded the aggregated parasfile ' + iteration_base_param_file + ' !\n')
+
+        taskEpochs = settings.epochs
+        taskInitStatus = "start"
+
+        ## initiate task release
+        while 1:
+            taskRelease = subprocess.Popen(["./hyperledger_invoke.sh release " + taskID], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+            trOuts, trErrs = taskRelease.communicate(timeout=10)
+            if taskRelease.poll() == 0:
+                print('*** ' + taskID + ' has been released! ***')
+                print('*** And the detail of this task is ' + trOuts.strip() + '! ***\n')
+                break
+            else:
+                print(trErrs)
+                print('*** Failed to release ' + taskID + ' ! ***\n')
+                time.sleep(2)
+
+        ## initiate task with base parameter hash
+
+        break
+
+        
+    # new_tx_01 = {"approved_tips": [], "model_accuracy": 34.0, "param_hash": "jyjtyjftyj", "shard_id": 1, "timestamp": 1683119166.5689557}
+    # new_tx_02 = {"approved_tips": [], "model_accuracy": 2.0, "param_hash": "asefasef", "shard_id": 0, "timestamp": 2345234525.5689557}
+
+    # new_tx_01 = MainchainTransaction(**new_tx_01)
+    # new_tx_02 = MainchainTransaction(**new_tx_02)
+
+    # client.upload_tx_to_server("localhost", new_tx_01)
+    # client.upload_tx_to_server("localhost", new_tx_02)
 
 if __name__ == "__main__":
     main()
