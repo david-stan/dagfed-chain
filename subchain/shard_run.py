@@ -9,8 +9,10 @@ import json
 import random
 import copy
 import subprocess
+import threading
 
 import client
+import fabric_api
 
 sys.path.append('./ml')
 sys.path.append('../')
@@ -24,11 +26,14 @@ from ml.models.FedAvg import FedAvg
 from common.ipfs import ipfsAddFile
 from common.ipfs import ipfsGetFile
 
+
+
 CACHE_DIR = "./cache/"
 CLIENT_DATA_DIR = pathlib.Path(CACHE_DIR) / "client"
 TX_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "txs"
 TIPS_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "pools"
 PARAMS_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "params"
+LOCAL_DATA_DIR = pathlib.Path(CLIENT_DATA_DIR) / "local"
 
 def main():
     
@@ -50,6 +55,10 @@ def main():
     if os.path.exists(PARAMS_DATA_DIR):
         shutil.rmtree(PARAMS_DATA_DIR)
     os.mkdir(PARAMS_DATA_DIR)
+
+    if os.path.exists(LOCAL_DATA_DIR):
+        shutil.rmtree(LOCAL_DATA_DIR)
+    os.mkdir(LOCAL_DATA_DIR)
 
     ## setup
 
@@ -131,6 +140,10 @@ def main():
         else:
             apv_trans_final = apv_tx_cands
 
+        print(f"***************************************************")
+        print(f"The candidates tips are {apv_tx_cands}")
+        print(f"***************************************************")
+
         # aggregating approver parameters
         w_apv_agg = []
         for apv_tx in apv_trans_final:
@@ -190,12 +203,89 @@ def main():
                 print('*** Failed to publish the init aggModel of ' + taskID + ' ! ***\n')
         
         # ## wait the local train
-        # time.sleep(10)
+        time.sleep(10)
+        selectedDevices = [0, 1, 2, 3, 4]
+        currentEpoch = 1
+        aggModelAcc = 50.0
+        while (currentEpoch <= settings.epochs):
+            flagList = set(copy.deepcopy(selectedDevices))
+            w_locals = []
+            while (len(flagList) != 0):
+                flagSet = set()
+                ts = []
+                lock = threading.Lock()
+                for deviceID in flagList:
+                    localFileName = f"./cache/client/local/{taskID}-{deviceID}-epoch-{str(currentEpoch)}.pkl"
+                    t = threading.Thread(target=fabric_api.query_local,args=(lock,taskID,deviceID,currentEpoch,flagSet,localFileName,))
+                    t.start()
+                    ts.append(t)
+                for t in ts:
+                    t.join()
+                time.sleep(2)
+                flagList = flagList - flagSet
+            for deviceID in selectedDevices:
+                localFileName = f"./cache/client/local/{taskID}-{deviceID}-epoch-{str(currentEpoch)}.pkl"
+                
+                ## check the acc of the models trained by selected device & drop the low quality model
+                canddts_dev_pas = torch.load(localFileName,map_location=torch.device('cpu'))
+                acc_canddts_dev, loss_canddts_dev = model_evaluate(net, canddts_dev_pas, test_dataset, settings)
+                acc_canddts_dev = acc_canddts_dev.cpu().numpy().tolist()
+                print("Test acc of the model trained by "+str(deviceID)+" is " + str(acc_canddts_dev))
+                if (acc_canddts_dev - aggModelAcc) < -10:
+                    print(str(deviceID)+" is a malicious device!")
+                else:
+                    w_locals.append(copy.deepcopy(canddts_dev_pas))
 
+            w_glob = FedAvg(w_locals)
+            aggEchoParasFile = './cache/client/params/aggModel-iter-'+str(iteration)+'-epoch-'+str(currentEpoch)+'.pkl'
+            torch.save(w_glob, aggEchoParasFile)
 
-        break
+            # evalute the acc of datatest
+            aggModelAcc, aggModelLoss = model_evaluate(net, w_glob, test_dataset, settings)
+            aggModelAcc = aggModelAcc.cpu().numpy().tolist()
 
-        
+            print("\n************************************")
+            print("Acc of the agg model of Round "+str(currentEpoch)+" in iteration "+str(iteration)+" is "+str(aggModelAcc))
+            print("************************************")
+
+            while 1:
+                aggEchoFileHash, sttCodeAdd = ipfsAddFile(aggEchoParasFile)
+                if sttCodeAdd == 0:
+                    print('\n*************************')
+                    print('The aggregated parasfile ' + aggEchoParasFile + ' has been uploaded!')
+                    print('And the fileHash is ' + aggEchoFileHash + '!')
+                    print('*************************\n')
+                    break
+                else:
+                    print('Error: ' + aggEchoFileHash)
+                    print('\nFailed to uploaded the aggregated parasfile ' + aggEchoParasFile + ' !\n')
+
+            taskStatus = 'training'
+            if currentEpoch == settings.epochs:
+                taskStatus = 'done'
+            while 1:
+                epochAggModelPublish = subprocess.Popen(args=[f"./hyperledger_invoke.sh aggregated {taskID} {str(currentEpoch)} {taskStatus} {aggEchoFileHash}"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+                aggPubOuts, aggPubErrs = epochAggModelPublish.communicate(timeout=10)
+                if epochAggModelPublish.poll() == 0:
+                    print('\n******************')
+                    print('The info of task ' + taskID + ' is ' + aggPubOuts.strip())
+                    print('The model aggregated in epoch ' + str(currentEpoch) + ' for ' + taskID + ' has been published!')
+                    print('******************\n')
+                    break
+                else:
+                    print(aggPubErrs)
+                    print('*** Failed to publish the Model aggregated in epoch ' + str(currentEpoch) + ' for ' + taskID + ' ! ***\n')
+            currentEpoch += 1
+
+        new_tx = {"approved_tips": apv_trans_final, "model_accuracy": aggModelAcc, "param_hash": aggEchoFileHash, "shard_id": 1, "timestamp": time.time()}
+        # upload the trans to DAG network
+        client.upload_tx_to_server("localhost", new_tx)
+        print('\n******************************* Transaction upload *******************************')
+        print('The details of this trans are', new_tx)
+        print('The trans generated in the iteration #%d had been uploaded!'%iteration)
+        print('*************************************************************************************\n')
+        iteration += 1
+        time.sleep(2)
     # new_tx_01 = {"approved_tips": [], "model_accuracy": 34.0, "param_hash": "jyjtyjftyj", "shard_id": 1, "timestamp": 1683119166.5689557}
     # new_tx_02 = {"approved_tips": [], "model_accuracy": 2.0, "param_hash": "asefasef", "shard_id": 0, "timestamp": 2345234525.5689557}
 
