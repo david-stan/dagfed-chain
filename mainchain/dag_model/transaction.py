@@ -19,7 +19,7 @@ param_hash       - hash of the parameters file
 class MainchainTransaction:
     def __init__(self,
                  param_hash,
-                 timestamp = time.time(),
+                 timestamp,
                  shard_id = 0,
                  approved_tips = [],
                  model_accuracy = 0.0,

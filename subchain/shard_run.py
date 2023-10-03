@@ -227,14 +227,14 @@ def main():
                 localFileName = f"./cache/client/local/{taskID}-{deviceID}-epoch-{str(currentEpoch)}.pkl"
                 
                 ## check the acc of the models trained by selected device & drop the low quality model
-                canddts_dev_pas = torch.load(localFileName,map_location=torch.device('cpu'))
+                canddts_dev_pas = torch.load(localFileName)
                 acc_canddts_dev, loss_canddts_dev = model_evaluate(net, canddts_dev_pas, test_dataset, settings)
                 acc_canddts_dev = acc_canddts_dev.cpu().numpy().tolist()
                 print("Test acc of the model trained by "+str(deviceID)+" is " + str(acc_canddts_dev))
-                if (acc_canddts_dev - aggModelAcc) < -10:
-                    print(str(deviceID)+" is a malicious device!")
-                else:
-                    w_locals.append(copy.deepcopy(canddts_dev_pas))
+                # if (acc_canddts_dev - aggModelAcc) < -10:
+                #     print(str(deviceID)+" is a malicious device!")
+                # else:
+                w_locals.append(copy.deepcopy(canddts_dev_pas))
 
             w_glob = FedAvg(w_locals)
             aggEchoParasFile = './cache/client/params/aggModel-iter-'+str(iteration)+'-epoch-'+str(currentEpoch)+'.pkl'

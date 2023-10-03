@@ -1,10 +1,10 @@
 class BaseSettings:
-    epochs = 5
+    epochs = 3
     num_users = 5
     client_frac = 0.5
-    non_iid_frac = 0.8
+    non_iid_frac = 0.95
     epochs_local = 3
-    batch_size_local = 10
+    batch_size_local = 20
     batch_size = 32
     learning_rate = 1e-3
     momentum = 0.9

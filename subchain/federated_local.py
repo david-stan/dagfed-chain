@@ -6,6 +6,9 @@ import time
 import torch
 import copy
 import subprocess
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 sys.path.append('./ml')
 sys.path.append('../')
@@ -77,6 +80,7 @@ if __name__ == '__main__':
             print('\n*************************************************************************************\n')
             currentEpoch = int(taskInfo['TaskEpochs']) + 1
             loss_train = []
+            acc_train = []
             while currentEpoch <= totalEpochs:
                 
                 while 1:
@@ -108,11 +112,14 @@ if __name__ == '__main__':
 
                 selectedDevices = [0, 1, 2, 3, 4]
                 loss_locals = []
+                acc_locals = []
 
                 for idx_user in selectedDevices:
                     local = LocalUpdate(settings, dataset_train, dict_users[idx_user])
                     w_local, loss_local = local.train(net=copy.deepcopy(net_glob).to(settings.device), user=idx_user)
+                    net_accuracy, _ = model_evaluate(net_glob, w_local, dataset_test, settings)
                     loss_locals.append(copy.deepcopy(loss_local))
+                    acc_locals.append(copy.deepcopy(net_accuracy))
                     localParamFile = f"./cache/local/paras/{taskID}-{selectedDevices[idx_user]}-epoch-{str(currentEpoch)}.pkl"
                     torch.save(w_local, localParamFile)
                     while 1:
@@ -136,9 +143,26 @@ if __name__ == '__main__':
                             time.sleep(2)
                 
                 loss_avg = sum(loss_locals) / len(loss_locals)
+                acc_avg = sum(acc_locals) / len(acc_locals)
                 print('Epoch {:3d}, Average loss {:.3f}'.format(currentEpoch, loss_avg))
+                print('Epoch {:3d}, Average acc {:.3f}'.format(currentEpoch, acc_avg))
                 loss_train.append(loss_avg)
+                acc_train.append(acc_avg)
                 currentEpoch += 1
 
             checkTaskID = taskID
+            # plt.figure()
+            # plt.plot(range(len(loss_train)), loss_train, 'b')
+            # plt.ylabel('Training Loss')
+            # plt.xlabel('# of Global Epochs')
+            # plt.title('Mini-Batch size = 20, Local Epochs = 5')
+            # plt.savefig('./fed_loss.png')
+
+            # plt.figure()
+            # plt.plot(range(len(acc_train)), acc_train, 'g')
+            # plt.ylabel('Testing Accuracy')
+            # plt.xlabel('# of Global Epochs')
+            # plt.title('Mini-Batch size = 20, Local Epochs = 5')
+            # plt.savefig('./fed_acc.png')
+
             iteration += 1
