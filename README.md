@@ -1,5 +1,5 @@
 # dagfed-chain
-Multihierarchical sharded blockchain solution for federated learning
+Scalable multihierarchical sharded blockchain solution for federated learning
 
 Blockchain platform consists of two layers:
 
