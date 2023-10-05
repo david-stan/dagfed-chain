@@ -1,6 +1,13 @@
 # dagfed-chain
 Multihierarchical sharded blockchain solution for federated learning
 
+Blockchain platform consists of two layers:
+
+* Mainchain layer - based on DAG (Tangle) consensus protocol, for maximum throughput [link](https://assets.ctfassets.net/r1dr6vzfxhev/4i3OM9JTleiE8M6Y04Ii28/d58bc5bb71cebe4adc18fadea1a79037/Tangle_White_Paper_v1.4.2.pdf)
+* Subchain layer -  blockchain layer consisted of multiple sharded hyperledger fabric networks. Each shard does federated learning task (FedAvg) independently of other shards and uploads its global model to the mainchain
+
+  
+
 # Solution discussion
 
 ## Systems heterogeneity 
